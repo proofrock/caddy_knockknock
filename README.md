@@ -1,12 +1,12 @@
 # Caddy Knock Knock
 
-A "simple enough but secure for someone" auth schema for caddy reverse proxies.
+A *simple enough but secure for someone* auth schema for caddy reverse proxies.
 
 Basically, you can forbid access to services until a particular, secret address is visited. Then the visiting IP gains access to the services until caddy is restarted.
 
-You must be aware that this URL is the equivalent of a token and must be protected as a secret. Don't create a bookmark in the browser. Keep it safe, really.
+You must be aware that this URL is **equivalent to a token and must be protected as a secret**. Don't create a bookmark in the browser. Keep it safe, really.
 
-Also, the IP should be fairly non-spoofable. Avoid VPNs!
+Also, the IP should be fairly non-shared and non-spoofable. **Avoid VPNs and public WiFi**!
 
 And yes, in the future I will add a timeout, not just "forever". But it's a good POC for now.
 
@@ -42,15 +42,14 @@ This is the corresponding `Caddyfile`:
 }
 
 protected.example.com {
-  caddy_knockknock {
-  }
+  caddy_knockknock
   reverse_proxy mysecretservice:12345
 }
 
 keyhole.example.com {
   caddy_knockknock {
-    key_hash "$argon2id$v=19$m=16,t=2,p=1$Y2lhb2dlcm0$llGztGLqY/nSR2ax5vCtIg"
     key_hole true
+    key_hash "$argon2id$v=19$m=16,t=2,p=1$Y2lhb2dlcm0$llGztGLqY/nSR2ax5vCtIg"
   }
   respond "IP Authorized!"
 }
