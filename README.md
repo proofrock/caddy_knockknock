@@ -13,7 +13,7 @@ And yes, in the future I will add a timeout, not just "forever". But it's a good
 ## Building
 
 ```bash
-xcaddy build --with github.com/proofrock/caddy_knockknock
+xcaddy build --with github.com/proofrock/caddy_knockknock@v0.0.1
 ```
 
 ## Configuration
