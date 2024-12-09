@@ -14,7 +14,7 @@ import (
 
 const VERSION = "v0.1.0"
 
-var cookey string = "kkkey" + genRandomString(4)
+var cookey string = "kkkey_" + genRandomString(4)
 
 func init() {
 	caddy.RegisterModule(CaddyKnockKnock{})
