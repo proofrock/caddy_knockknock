@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -13,10 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const VERSION = "v0.0.1"
-
-var mutex sync.RWMutex
-var authorisedIPs map[string]any = make(map[string]any)
+const VERSION = "v0.1.0"
 
 func init() {
 	caddy.RegisterModule(CaddyKnockKnock{})
@@ -25,11 +21,7 @@ func init() {
 
 type CaddyKnockKnock struct {
 	HashedKey string `json:"key_hash,omitempty"`
-	IsKeyHole string `json:"key_hole,omitempty"`
-
-	isKeyHole bool
-
-	logger *zap.Logger
+	logger    *zap.Logger
 }
 
 func (CaddyKnockKnock) CaddyModule() caddy.ModuleInfo {
@@ -42,17 +34,7 @@ func (CaddyKnockKnock) CaddyModule() caddy.ModuleInfo {
 func (m *CaddyKnockKnock) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger()
 
-	m.isKeyHole = strings.ToLower(m.IsKeyHole) == "true"
-
-	if m.isKeyHole && m.HashedKey == "" {
-		return errors.New("this node is a keyhole but doesn't specify a key_hash")
-	}
-
-	if m.isKeyHole {
-		m.logger.Sugar().Infof("KnockKnock %s: init'd as keyhole", VERSION)
-	} else {
-		m.logger.Sugar().Infof("KnockKnock %s: init'd", VERSION)
-	}
+	m.logger.Sugar().Infof("KnockKnock %s: init'd", VERSION)
 
 	return nil
 }
@@ -68,23 +50,38 @@ func cutToColon(input string) string {
 
 func (m CaddyKnockKnock) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var ip = cutToColon(r.RemoteAddr)
-	if m.isKeyHole {
-		url := r.URL.String()
-		password := url[(strings.LastIndex(url, "/") + 1):]
-		if ok, _ := comparePasswordAndHash(password, m.HashedKey); ok {
-			mutex.Lock()
-			defer mutex.Unlock()
-			authorisedIPs[ip] = true
-			return next.ServeHTTP(w, r)
+	var key = r.URL.Query().Get("kkkey")
+
+	if key != "" {
+		q := r.URL.Query()
+		q.Del("kkkey")
+		r.URL.RawQuery = q.Encode()
+
+		if ok, _ := comparePasswordAndHash(key, m.HashedKey); !ok {
+			return caddyhttp.Error(403, errors.New("wrong key"))
 		}
-		return caddyhttp.Error(403, errors.New("wrong key"))
 	}
-	mutex.RLock()
-	defer mutex.RUnlock()
-	if _, ok := authorisedIPs[ip]; ok {
-		return next.ServeHTTP(w, r)
+
+	cookie, _ := r.Cookie("kkkookie")
+	if cookie != nil {
+		if cookie.Value != getSession(ip) {
+			return caddyhttp.Error(403, errors.New("wrong cookie"))
+		}
+	} else {
+		if key == "" {
+			return caddyhttp.Error(403, errors.New("key or cookie must be provided"))
+		} else {
+			http.SetCookie(w, &http.Cookie{
+				Name:     "kkkookie",
+				Value:    newSession(ip),
+				Path:     "/",
+				HttpOnly: true,
+				Secure:   true,
+			})
+		}
 	}
-	return caddyhttp.Error(403, errors.New("blocked IP"))
+
+	return next.ServeHTTP(w, r)
 }
 
 func (m *CaddyKnockKnock) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -94,10 +91,6 @@ func (m *CaddyKnockKnock) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			case "key_hash":
 				if !d.Args(&m.HashedKey) {
 					return d.Err("invalid key_hash configuration")
-				}
-			case "key_hole":
-				if !d.Args(&m.IsKeyHole) {
-					return d.Err("invalid key_hole configuration")
 				}
 			default:
 				return d.Errf("unknown directive: %s", d.Val())
