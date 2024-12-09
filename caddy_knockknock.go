@@ -14,6 +14,8 @@ import (
 
 const VERSION = "v0.1.0"
 
+var cookey string = "kkkey" + genRandomString(4)
+
 func init() {
 	caddy.RegisterModule(CaddyKnockKnock{})
 	httpcaddyfile.RegisterHandlerDirective("caddy_knockknock", parseCaddyfile)
@@ -62,7 +64,7 @@ func (m CaddyKnockKnock) ServeHTTP(w http.ResponseWriter, r *http.Request, next 
 		}
 	}
 
-	cookie, _ := r.Cookie("kkkookie")
+	cookie, _ := r.Cookie(cookey)
 	if cookie != nil {
 		if cookie.Value != getSession(ip) {
 			return caddyhttp.Error(403, errors.New("wrong cookie"))
@@ -72,7 +74,7 @@ func (m CaddyKnockKnock) ServeHTTP(w http.ResponseWriter, r *http.Request, next 
 			return caddyhttp.Error(403, errors.New("key or cookie must be provided"))
 		} else {
 			http.SetCookie(w, &http.Cookie{
-				Name:     "kkkookie",
+				Name:     cookey,
 				Value:    newSession(ip),
 				Path:     "/",
 				HttpOnly: true,
