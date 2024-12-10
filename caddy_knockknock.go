@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const VERSION = "v0.1.2"
+const VERSION = "v0.1.3"
 
 var cookey string = "kkkey_" + genRandomString(4)
 
@@ -55,10 +55,9 @@ func (m CaddyKnockKnock) ServeHTTP(w http.ResponseWriter, r *http.Request, next 
 
 	var cookieSituation = false // false: not present; true: present and invalid
 	cookie, err := r.Cookie(cookey)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "named cookie not present") {
 		return caddyhttp.Error(505, err)
-	}
-	if cookie != nil {
+	} else if cookie != nil {
 		if cookie.Value == getSession(ip) {
 			return next.ServeHTTP(w, r)
 		}
